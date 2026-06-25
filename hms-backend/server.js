@@ -4,7 +4,10 @@ const appointmentRoutes = require('./routes/appointments');
 require('dotenv').config();
 const dashboardRoutes = require('./routes/dashboard');
 const app = express();
+const billingRoutes = require('./routes/billing');
 const authRoutes = require('./routes/auth');
+const medicalRoutes = require('./routes/medical');
+const pharmacyRoutes = require('./routes/pharmacy');
 app.use(cors({
   origin: 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -20,6 +23,12 @@ app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/medical', medicalRoutes);
+app.use('/api/pharmacy', pharmacyRoutes);
+app.use('/api/prescriptions', require('./routes/prescriptions'));
+app.use('/api/billing', billingRoutes);
+app.use('/api/reports', require('./routes/reports'));
+
 app.get('/api/status', (req, res) => {
   res.json({ message: 'Prisma Server is running perfectly!' });
 });

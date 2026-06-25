@@ -14,6 +14,9 @@ import Doctors from "./pages/Doctors";
 import Pharmacy from "./pages/Pharmacy";
 import Billing from "./pages/Billing";
 import MedicalRecords from "./pages/MedicalRecords";
+import Profile from "./pages/Profile";
+import Prescriptions from "./pages/Prescriptions";
+import Reports from "./pages/Reports";
 
 // --- THE UPGRADED SECURITY WRAPPER ---
 const ProtectedLayout = () => {
@@ -52,6 +55,9 @@ function App() {
           <Route path="/billing" element={<Billing />} />
           <Route path="/records" element={<MedicalRecords />} />
           <Route path="/lab" element={<MedicalRecords />} />
+          <Route path="/prescriptions" element={<Prescriptions />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/reports" element={<Reports />} />
         </Route>
 
         {/* Catch-all for undefined routes */}

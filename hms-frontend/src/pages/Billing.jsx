@@ -1,38 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Filter, Download, Receipt, 
-  CheckCircle, Clock, AlertCircle, X, DollarSign, FileText 
+  CheckCircle, Clock, AlertCircle, X, DollarSign, FileText, Loader2 
 } from 'lucide-react';
-
-// Fake database for Invoices
-const initialInvoices = [
-  { id: 'INV-2026-001', patient: 'Sarah Jenkins', date: '2026-06-20', type: 'Consultation & Pharmacy', amount: 145.50, status: 'Paid' },
-  { id: 'INV-2026-002', patient: 'Michael Chen', date: '2026-06-22', type: 'Surgery (Appendectomy)', amount: 4500.00, status: 'Pending' },
-  { id: 'INV-2026-003', patient: 'Emily Rodriguez', date: '2026-05-15', type: 'Lab Tests', amount: 320.00, status: 'Overdue' },
-  { id: 'INV-2026-004', patient: 'James Wilson', date: '2026-06-23', type: 'Cardiology Checkup', amount: 250.00, status: 'Paid' },
-  { id: 'INV-2026-005', patient: 'Maria Garcia', date: '2026-06-24', type: 'Pharmacy (Prescription)', amount: 45.00, status: 'Pending' },
-];
 
 export default function Billing() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [invoices, setInvoices] = useState(initialInvoices);
+  const [invoices, setInvoices] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     patient: '', type: 'Consultation', amount: '', status: 'Pending'
   });
 
-  // Calculate quick financial stats
+  // --- 1. FETCH REAL DATA FROM BACKEND ---
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/billing');
+      if (response.ok) {
+        const data = await response.json();
+        setInvoices(data);
+      }
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 2. CREATE NEW INVOICE ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:5000/api/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          amount: parseFloat(formData.amount)
+        })
+      });
+
+      if (response.ok) {
+        fetchInvoices(); // Refresh the list
+        setIsModalOpen(false);
+        setFormData({ patient: '', type: 'Consultation', amount: '', status: 'Pending' });
+      }
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+    }
+  };
+
+  // --- 3. MARK AS PAID ---
+  const handleMarkAsPaid = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/billing/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Paid' })
+      });
+      
+      if (response.ok) {
+        fetchInvoices(); // Refresh the list to update the financial cards!
+      }
+    } catch (error) {
+      console.error("Error updating invoice:", error);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Calculate quick financial stats safely
   const totalRevenue = invoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + inv.amount, 0);
   const pendingAmount = invoices.filter(inv => inv.status === 'Pending').reduce((sum, inv) => sum + inv.amount, 0);
   const overdueAmount = invoices.filter(inv => inv.status === 'Overdue').reduce((sum, inv) => sum + inv.amount, 0);
 
   const filteredInvoices = invoices.filter(inv => 
     inv.patient.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    inv.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (inv.invoiceId && inv.invoiceId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Helper for Status Badges
   const getStatusBadge = (status) => {
     switch(status) {
       case 'Paid': return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center gap-1.5 w-max"><CheckCircle size={14}/> Paid</span>;
@@ -42,26 +96,9 @@ export default function Billing() {
     }
   };
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const newInvoice = {
-      ...formData,
-      id: `INV-2026-00${invoices.length + 1}`,
-      date: new Date().toISOString().split('T')[0],
-      amount: parseFloat(formData.amount)
-    };
-    setInvoices([newInvoice, ...invoices]);
-    setIsModalOpen(false);
-    setFormData({ patient: '', type: 'Consultation', amount: '', status: 'Pending' });
-  };
-
-  const handleMarkAsPaid = (id) => {
-    setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: 'Paid' } : inv));
-  };
+  if (isLoading) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
+  }
 
   return (
     <div className="h-full flex flex-col relative space-y-6">
@@ -121,10 +158,6 @@ export default function Billing() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors bg-white">
-            <Filter size={18} />
-            <span>Filter</span>
-          </button>
         </div>
 
         {/* Data Table */}
@@ -149,8 +182,8 @@ export default function Billing() {
                         <Receipt size={18} />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">{inv.id}</p>
-                        <p className="text-xs text-gray-500">{inv.date}</p>
+                        <p className="font-semibold text-gray-800">{inv.invoiceId}</p>
+                        <p className="text-xs text-gray-500">{new Date(inv.date).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </td>
@@ -180,7 +213,7 @@ export default function Billing() {
           
           {filteredInvoices.length === 0 && (
             <div className="p-10 text-center text-gray-500">
-              No invoices found matching "{searchTerm}"
+              No invoices found.
             </div>
           )}
         </div>
@@ -199,7 +232,7 @@ export default function Billing() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Patient Name</label>
-                <input required type="text" name="patient" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all bg-gray-50 focus:bg-white" value={formData.patient} onChange={handleInputChange} placeholder="Search patient..." />
+                <input required type="text" name="patient" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all bg-gray-50 focus:bg-white" value={formData.patient} onChange={handleInputChange} placeholder="E.g. Sarah Jenkins" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Service Type</label>

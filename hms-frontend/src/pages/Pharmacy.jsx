@@ -1,19 +1,10 @@
-import React, { useState } from 'react';
-import { Search, Plus, Filter, AlertTriangle, Pill, Edit, Trash2, X } from 'lucide-react';
-
-// Fake database for Medicines
-const initialInventory = [
-  { id: 'MED-001', name: 'Amoxicillin 500mg', category: 'Antibiotics', stock: 850, price: 12.50, status: 'In Stock' },
-  { id: 'MED-002', name: 'Ibuprofen 400mg', category: 'Pain Relief', stock: 1200, price: 5.00, status: 'In Stock' },
-  { id: 'MED-003', name: 'Lisinopril 10mg', category: 'Cardiovascular', stock: 15, price: 18.00, status: 'Low Stock' },
-  { id: 'MED-004', name: 'Metformin 850mg', category: 'Diabetes', stock: 0, price: 9.50, status: 'Out of Stock' },
-  { id: 'MED-005', name: 'Omeprazole 20mg', category: 'Gastrointestinal', stock: 430, price: 14.00, status: 'In Stock' },
-  { id: 'MED-006', name: 'Azithromycin 250mg', category: 'Antibiotics', stock: 45, price: 22.00, status: 'Low Stock' },
-];
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Filter, AlertTriangle, Pill, Edit, Trash2, X, Loader2 } from 'lucide-react';
 
 export default function Pharmacy() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [inventory, setInventory] = useState(initialInventory);
+  const [inventory, setInventory] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,13 +12,81 @@ export default function Pharmacy() {
     name: '', category: 'Antibiotics', stock: '', price: ''
   });
 
-  // Calculate quick stats
+  // --- 1. FETCH REAL DATA FROM BACKEND ---
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/pharmacy');
+      if (response.ok) {
+        const data = await response.json();
+        setInventory(data);
+      }
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 2. ADD NEW MEDICINE ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const stockNum = parseInt(formData.stock);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/pharmacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          stock: stockNum,
+          price: parseFloat(formData.price),
+          status: stockNum === 0 ? 'Out of Stock' : stockNum < 50 ? 'Low Stock' : 'In Stock'
+        })
+      });
+
+      if (response.ok) {
+        fetchInventory(); // Refresh the list
+        setIsModalOpen(false);
+        setFormData({ name: '', category: 'Antibiotics', stock: '', price: '' });
+      }
+    } catch (error) {
+      console.error("Error adding medicine:", error);
+    }
+  };
+
+  // --- 3. DELETE MEDICINE ---
+  const handleDelete = async (id) => {
+    if (window.confirm("Remove this medicine from inventory?")) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/pharmacy/${id}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          fetchInventory(); // Refresh the list
+        }
+      } catch (error) {
+        console.error("Error deleting medicine:", error);
+      }
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Calculate quick stats safely
   const lowStockCount = inventory.filter(med => med.stock > 0 && med.stock < 50).length;
   const outOfStockCount = inventory.filter(med => med.stock === 0).length;
 
   const filteredInventory = inventory.filter(med => 
     med.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    med.category.toLowerCase().includes(searchTerm.toLowerCase())
+    med.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (med.medId && med.medId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   // Status Badge Logic
@@ -37,30 +96,9 @@ export default function Pharmacy() {
     return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">In Stock</span>;
   };
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const stockNum = parseInt(formData.stock);
-    const newMedicine = {
-      ...formData,
-      id: `MED-00${inventory.length + 1}`,
-      stock: stockNum,
-      price: parseFloat(formData.price),
-      status: stockNum === 0 ? 'Out of Stock' : stockNum < 50 ? 'Low Stock' : 'In Stock'
-    };
-    setInventory([newMedicine, ...inventory]);
-    setIsModalOpen(false);
-    setFormData({ name: '', category: 'Antibiotics', stock: '', price: '' });
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Remove this medicine from inventory?")) {
-      setInventory(inventory.filter(med => med.id !== id));
-    }
-  };
+  if (isLoading) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
+  }
 
   return (
     <div className="h-full flex flex-col relative">
@@ -94,16 +132,12 @@ export default function Pharmacy() {
           <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input 
             type="text" 
-            placeholder="Search by medicine name or category..." 
+            placeholder="Search by medicine name or ID..." 
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors w-full sm:w-auto justify-center">
-          <Filter size={18} />
-          <span>Filters</span>
-        </button>
       </div>
 
       {/* Data Table */}
@@ -130,7 +164,7 @@ export default function Pharmacy() {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">{med.name}</p>
-                        <p className="text-xs text-gray-500">{med.id}</p>
+                        <p className="text-xs text-gray-500">{med.medId}</p>
                       </div>
                     </div>
                   </td>

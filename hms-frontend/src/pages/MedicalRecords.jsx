@@ -1,69 +1,104 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Filter, FileText, FlaskConical, 
-  Download, Eye, Activity, CheckCircle2, Clock, X 
+  Download, Eye, Activity, CheckCircle2, Clock, X, Loader2 
 } from 'lucide-react';
 
-// Fake database for Clinical Records
-const initialRecords = [
-  { id: 'REC-101', patient: 'Sarah Jenkins', date: '2026-06-20', doctor: 'Dr. Emily Chen', diagnosis: 'Hypertension', prescription: 'Lisinopril 10mg' },
-  { id: 'REC-102', patient: 'Michael Chen', date: '2026-06-15', doctor: 'Dr. James Wilson', diagnosis: 'Acute Bronchitis', prescription: 'Amoxicillin 500mg' },
-  { id: 'REC-103', patient: 'Emily Rodriguez', date: '2026-05-10', doctor: 'Dr. Sarah Smith', diagnosis: 'Type 2 Diabetes', prescription: 'Metformin 850mg' },
-];
-
-// Fake database for Lab Tests
-const initialLabs = [
-  { id: 'LAB-201', patient: 'Sarah Jenkins', date: '2026-06-20', test: 'Complete Blood Count (CBC)', status: 'Completed', result: 'Normal' },
-  { id: 'LAB-202', patient: 'James Wilson', date: '2026-06-25', test: 'Lipid Panel', status: 'Pending', result: '-' },
-  { id: 'LAB-203', patient: 'Michael Chen', date: '2026-06-26', test: 'Chest X-Ray', status: 'Pending', result: '-' },
-  { id: 'LAB-204', patient: 'Maria Garcia', date: '2026-06-22', test: 'Thyroid Panel (TSH)', status: 'Completed', result: 'Slightly Elevated' },
-];
-
 export default function MedicalRecords() {
-  const [activeTab, setActiveTab] = useState('records'); // 'records' or 'labs'
+  const [activeTab, setActiveTab] = useState('records'); 
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [records, setRecords] = useState(initialRecords);
-  const [labs, setLabs] = useState(initialLabs);
+  const [records, setRecords] = useState([]);
+  const [labs, setLabs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    patient: '', doctor: '', diagnosis: '', prescription: '', test: ''
+    patient: '', doctor: '', diagnosis: '', prescription: '', test: 'Complete Blood Count (CBC)'
   });
 
-  // Filter logic based on the active tab
-  const filteredRecords = records.filter(rec => rec.patient.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredLabs = labs.filter(lab => lab.patient.toLowerCase().includes(searchTerm.toLowerCase()));
+  // --- 1. FETCH REAL DATA FROM BACKEND ---
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    try {
+      // Fetch both records and labs at the same time
+      const [recordsRes, labsRes] = await Promise.all([
+        fetch('http://localhost:5000/api/medical/records'),
+        fetch('http://localhost:5000/api/medical/labs')
+      ]);
+
+      if (recordsRes.ok && labsRes.ok) {
+        const recordsData = await recordsRes.json();
+        const labsData = await labsRes.json();
+        setRecords(recordsData);
+        setLabs(labsData);
+      }
+    } catch (error) {
+      console.error("Error fetching medical data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 2. ADD RECORD OR LAB TEST ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const endpoint = activeTab === 'records' ? '/records' : '/labs';
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/medical${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        fetchAllData(); // Refresh the lists
+        setIsModalOpen(false);
+        setFormData({ patient: '', doctor: '', diagnosis: '', prescription: '', test: 'Complete Blood Count (CBC)' });
+      }
+    } catch (error) {
+      console.error(`Error adding ${activeTab}:`, error);
+    }
+  };
+
+  // --- 3. MARK LAB AS COMPLETED ---
+  const markLabCompleted = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/medical/labs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Completed', result: 'Pending Doctor Review' })
+      });
+      
+      if (response.ok) {
+        fetchAllData(); // Refresh the list
+      }
+    } catch (error) {
+      console.error("Error updating lab status:", error);
+    }
+  };
 
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (activeTab === 'records') {
-      const newRecord = {
-        ...formData,
-        id: `REC-${Math.floor(Math.random() * 900) + 100}`,
-        date: new Date().toISOString().split('T')[0]
-      };
-      setRecords([newRecord, ...records]);
-    } else {
-      const newLab = {
-        patient: formData.patient,
-        test: formData.test,
-        id: `LAB-${Math.floor(Math.random() * 900) + 100}`,
-        date: new Date().toISOString().split('T')[0],
-        status: 'Pending',
-        result: '-'
-      };
-      setLabs([newLab, ...labs]);
-    }
-    setIsModalOpen(false);
-    setFormData({ patient: '', doctor: '', diagnosis: '', prescription: '', test: '' });
-  };
+  // Filter logic 
+  const filteredRecords = records.filter(rec => 
+    rec.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (rec.recordId && rec.recordId.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+  
+  const filteredLabs = labs.filter(lab => 
+    lab.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (lab.labId && lab.labId.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
-  const markLabCompleted = (id) => {
-    setLabs(labs.map(lab => lab.id === id ? { ...lab, status: 'Completed', result: 'Pending Doctor Review' } : lab));
-  };
+  if (isLoading) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
+  }
 
   return (
     <div className="h-full flex flex-col relative space-y-6">
@@ -115,15 +150,12 @@ export default function MedicalRecords() {
               <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="Search patient records..." 
+                placeholder="Search by patient or ID..." 
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 bg-white">
-              <Filter size={18} />
-            </button>
           </div>
         </div>
 
@@ -154,8 +186,8 @@ export default function MedicalRecords() {
               {activeTab === 'records' && filteredRecords.map((rec) => (
                 <tr key={rec.id} className="hover:bg-gray-50 group transition-colors">
                   <td className="p-4">
-                    <p className="text-sm font-semibold text-gray-800">{rec.date}</p>
-                    <p className="text-xs text-gray-500">{rec.id}</p>
+                    <p className="text-sm font-semibold text-gray-800">{new Date(rec.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">{rec.recordId}</p>
                   </td>
                   <td className="p-4 font-medium text-gray-700">{rec.patient}</td>
                   <td className="p-4 text-sm text-gray-600">{rec.doctor}</td>
@@ -176,8 +208,8 @@ export default function MedicalRecords() {
               {activeTab === 'labs' && filteredLabs.map((lab) => (
                 <tr key={lab.id} className="hover:bg-gray-50 group transition-colors">
                   <td className="p-4">
-                    <p className="text-sm font-semibold text-gray-800">{lab.date}</p>
-                    <p className="text-xs text-gray-500">{lab.id}</p>
+                    <p className="text-sm font-semibold text-gray-800">{new Date(lab.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">{lab.labId}</p>
                   </td>
                   <td className="p-4 font-medium text-gray-700">{lab.patient}</td>
                   <td className="p-4 text-sm font-medium text-gray-800">{lab.test}</td>
@@ -208,6 +240,12 @@ export default function MedicalRecords() {
 
             </tbody>
           </table>
+          
+          {(activeTab === 'records' && filteredRecords.length === 0) || (activeTab === 'labs' && filteredLabs.length === 0) ? (
+            <div className="p-10 text-center text-gray-500">
+              No data found.
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -225,28 +263,28 @@ export default function MedicalRecords() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Patient Name</label>
-                <input required type="text" name="patient" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={formData.patient} onChange={handleInputChange} placeholder="Search patient..." />
+                <input required type="text" name="patient" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={formData.patient} onChange={handleInputChange} placeholder="E.g. Sarah Jenkins" />
               </div>
 
               {activeTab === 'records' ? (
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Attending Doctor</label>
-                    <input required type="text" name="doctor" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={formData.doctor} onChange={handleInputChange} />
+                    <input required type="text" name="doctor" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={formData.doctor} onChange={handleInputChange} placeholder="E.g. Dr. Emily Chen" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Diagnosis</label>
-                    <input required type="text" name="diagnosis" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={formData.diagnosis} onChange={handleInputChange} />
+                    <input required type="text" name="diagnosis" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={formData.diagnosis} onChange={handleInputChange} />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Prescription Details</label>
-                    <input required type="text" name="prescription" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={formData.prescription} onChange={handleInputChange} />
+                    <input required type="text" name="prescription" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={formData.prescription} onChange={handleInputChange} />
                   </div>
                 </>
               ) : (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Select Lab Test</label>
-                  <select name="test" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" value={formData.test} onChange={handleInputChange}>
+                  <select name="test" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={formData.test} onChange={handleInputChange}>
                     <option value="Complete Blood Count (CBC)">Complete Blood Count (CBC)</option>
                     <option value="Lipid Panel">Lipid Panel</option>
                     <option value="Comprehensive Metabolic Panel">Comprehensive Metabolic Panel</option>

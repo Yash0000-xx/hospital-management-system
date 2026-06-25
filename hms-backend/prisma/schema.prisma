@@ -57,3 +57,48 @@ model Admin {
   username String @unique
   password String // We will store an encrypted hash here, never the real password!
 }
+model Invoice {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceId String   @unique // We will auto-generate INV-2026-001
+  patient   String
+  type      String
+  amount    Float
+  status    String   @default("Pending")
+  date      DateTime @default(now())
+}
+model Medicine {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  medId    String   @unique // We will auto-generate MED-1234
+  name     String
+  category String
+  stock    Int
+  price    Float
+  status   String
+  addedAt  DateTime @default(now())
+}
+model ClinicalRecord {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  recordId     String   @unique // Auto-generated REC-123
+  patient      String
+  doctor       String
+  diagnosis    String
+  prescription String
+  date         DateTime @default(now())
+}
+
+model LabTest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  labId     String   @unique // Auto-generated LAB-123
+  patient   String
+  test      String
+  status    String   @default("Pending")
+  result    String   @default("-")
+  date      DateTime @default(now())
+}
+model Prescription {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  patient      String
+  medicine     String
+  dosage       String
+  instructions String
+}
