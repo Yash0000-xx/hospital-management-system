@@ -1,0 +1,10 @@
+# Ignore huge dependency folders
+node_modules/
+hms-frontend/node_modules/
+hms-backend/node_modules/
+
+# Ignore compiled frontend files
+hms-frontend/dist/
+
+# Ignore environment variables and secrets
+.env

@@ -1,0 +1,59 @@
+// This tells Prisma to connect to MongoDB
+datasource db {
+  provider = "mongodb"
+  url      = "mongodb://127.0.0.1:27017/hms_database"
+}
+
+// This tells Prisma to generate JavaScript code for us
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------
+// OUR DATABASE MODELS
+// -------------------------
+
+model Patient {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  age          String        // Changed to String to perfectly match your backend fix
+  gender       String
+  phone        String
+  status       String        @default("Active")
+  
+  appointments Appointment[]
+  
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Doctor {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  specialization String
+  phone          String
+  email          String?       @unique // Optional, but good to have
+  status         String        @default("Active")
+  
+  appointments   Appointment[] 
+}
+
+model Appointment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  date      DateTime
+  time      String
+  reason    String
+  status    String   @default("Scheduled")
+
+  // The relational links:
+  patientId String   @db.ObjectId
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  
+  doctorId  String   @db.ObjectId
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+}
+model Admin {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  username String @unique
+  password String // We will store an encrypted hash here, never the real password!
+}
