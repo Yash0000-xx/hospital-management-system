@@ -15,6 +15,8 @@ import Pharmacy from "./pages/Pharmacy";
 import Billing from "./pages/Billing";
 import MedicalRecords from "./pages/MedicalRecords";
 import Profile from "./pages/Profile";
+import Departments from "./pages/Departments";
+import Staff from "./pages/Staff";
 import Prescriptions from "./pages/Prescriptions";
 import Reports from "./pages/Reports";
 
@@ -56,6 +58,8 @@ function App() {
           <Route path="/records" element={<MedicalRecords />} />
           <Route path="/lab" element={<MedicalRecords />} />
           <Route path="/prescriptions" element={<Prescriptions />} />
+          <Route path="/staff" element={<Staff />} />
+          <Route path="/departments" element={<Departments />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/reports" element={<Reports />} />
         </Route>

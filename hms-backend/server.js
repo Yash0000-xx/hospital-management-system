@@ -27,6 +27,8 @@ app.use('/api/medical', medicalRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/prescriptions', require('./routes/prescriptions'));
 app.use('/api/billing', billingRoutes);
+app.use('/api/staff', require('./routes/staff'));
+app.use('/api/departments', require('./routes/departments'));
 app.use('/api/reports', require('./routes/reports'));
 
 app.get('/api/status', (req, res) => {

@@ -102,3 +102,16 @@ model Prescription {
   dosage       String
   instructions String
 }
+model Staff {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  role       String
+  department String
+  email      String
+}
+model Department {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  head       String
+  staffCount Int
+}
